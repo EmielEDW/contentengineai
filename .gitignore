@@ -41,6 +41,9 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 
+# vercel
+.vercel
+
 # turbo / caches
 .turbo
 .cache
