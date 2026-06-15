@@ -1,0 +1,52 @@
+# dependencies
+/node_modules
+/.pnp
+.pnp.*
+
+# next.js
+/.next/
+/out/
+next-env.d.ts
+
+# production
+/build
+
+# misc
+.DS_Store
+*.pem
+.vscode/
+.idea/
+
+# Claude Code local settings (machine-specific)
+.claude/settings.local.json
+
+# debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# env files (never commit secrets)
+.env
+.env*.local
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# supabase
+/supabase/.branches
+/supabase/.temp
+/supabase/.env
+
+# typescript
+*.tsbuildinfo
+
+# turbo / caches
+.turbo
+.cache
+
+# OS / Google Drive cruft
+Icon?
+._*
+.Spotlight-V100
+.Trashes
