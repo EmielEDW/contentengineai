@@ -1,16 +1,40 @@
 @import "tailwindcss";
 
-:root {
-  --background: #0a0a0a;
-  --foreground: #ededed;
-  --muted: #a1a1aa;
-  --border: #27272a;
-  --accent: #16a34a;
+@theme {
+  --color-bg: #0a0a0b;
+  --color-surface: #131317;
+  --color-surface-2: #1a1a20;
+  --color-border: #26262d;
+  --color-muted: #9a9aa6;
+  --color-fg: #ededf1;
+  --color-accent: #16a34a;
+  --color-accent-soft: #16a34a26;
+  --color-gate: #eab308;
+  --color-gate-soft: #eab30822;
+  --color-auto: #22c55e;
+  --color-lock: #6b7280;
+
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
 }
 
-html,
+* {
+  border-color: var(--color-border);
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  background-color: var(--color-bg);
+  color: var(--color-fg);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* subtle radial backdrop */
+.app-backdrop {
+  background:
+    radial-gradient(900px 500px at 80% -10%, #16a34a18, transparent 60%),
+    radial-gradient(700px 400px at 0% 0%, #3b82f614, transparent 55%);
 }
