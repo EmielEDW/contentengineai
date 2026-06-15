@@ -1,13 +1,14 @@
 "use client";
 
 import { createBrowserClient } from "@supabase/ssr";
-import { publicEnv } from "@/lib/env";
+import { requireSupabasePublicEnv } from "@/lib/env";
 import type { Database } from "./database.types";
 
 /** Browser Supabase client (anon key + the user's session). RLS applies. */
 export function createClient() {
+  const env = requireSupabasePublicEnv();
   return createBrowserClient<Database>(
-    publicEnv.NEXT_PUBLIC_SUPABASE_URL,
-    publicEnv.NEXT_PUBLIC_SUPABASE_ANON_KEY
+    env.NEXT_PUBLIC_SUPABASE_URL,
+    env.NEXT_PUBLIC_SUPABASE_ANON_KEY
   );
 }
