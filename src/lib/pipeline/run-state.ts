@@ -53,33 +53,45 @@ export async function runState(args: RunStateArgs): Promise<RunStateResult> {
   const model = modelFor(providerId, built.modelClass);
 
   const schemaName = `state_${args.stateNo}`;
-  const result = await llm.complete(
-    {
-      system: built.system,
-      messages: built.messages,
-      jsonSchema: jsonSchemaFor(args.stateNo, schemaName) as object,
-      jsonSchemaName: schemaName,
-      model,
-      temperature: built.modelClass === "strong" ? 0.7 : 0.5,
-    },
-    { orgId: args.orgId, channelId: args.channelId ?? "", projectId: args.videoId ?? "", key }
-  );
+  const jsonSchema = jsonSchemaFor(args.stateNo, schemaName) as object;
+  const baseMessages = built.messages;
 
-  if (!result.ok || !result.data) {
-    const err = result.error;
-    const e = new Error(`State ${args.stateNo} LLM call failed: ${err?.message ?? "unknown"}`);
-    // Mark retryability for the orchestrator (Inngest treats thrown errors as retryable
-    // unless wrapped in NonRetriableError — the caller decides based on err.retryable).
-    (e as Error & { retryable?: boolean }).retryable = err?.retryable ?? true;
-    throw e;
+  // Generate + validate, with one corrective retry if the JSON doesn't match the
+  // schema (models occasionally deviate; we re-ask with the validation error).
+  let output: unknown;
+  let result: Awaited<ReturnType<typeof llm.complete>> | undefined;
+  let lastError = "";
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const messages =
+      attempt === 0
+        ? baseMessages
+        : [
+            ...baseMessages,
+            {
+              role: "user" as const,
+              content: `Your previous output failed validation: ${lastError}. Return corrected JSON that matches the schema EXACTLY (same keys, correct types, required array lengths). Output JSON only.`,
+            },
+          ];
+    result = await llm.complete(
+      { system: built.system, messages, jsonSchema, jsonSchemaName: schemaName, model, temperature: built.modelClass === "strong" ? 0.7 : 0.5 },
+      { orgId: args.orgId, channelId: args.channelId ?? "", projectId: args.videoId ?? "", key }
+    );
+    if (!result.ok || !result.data) {
+      const err = result.error;
+      const e = new Error(`State ${args.stateNo} LLM call failed: ${err?.message ?? "unknown"}`);
+      (e as Error & { retryable?: boolean }).retryable = err?.retryable ?? true;
+      throw e;
+    }
+    const parsed = entry.schema.safeParse(result.data.json);
+    if (parsed.success) {
+      output = parsed.data;
+      break;
+    }
+    lastError = parsed.error.message.slice(0, 500);
   }
-
-  // Validate against the Zod schema (defense beyond the provider's own enforcement).
-  const parsed = entry.schema.safeParse(result.data.json);
-  if (!parsed.success) {
-    throw new Error(`State ${args.stateNo} output failed schema validation: ${parsed.error.message}`);
+  if (output === undefined || !result?.data) {
+    throw new Error(`State ${args.stateNo} output failed schema validation after retry: ${lastError}`);
   }
-  const output = parsed.data;
 
   const saved = await repo.saveAsset({
     orgId: args.orgId,

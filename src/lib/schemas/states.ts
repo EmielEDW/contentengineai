@@ -90,13 +90,9 @@ export const HookOptions = z.object({
     .array(
       z.object({
         rank: z.number().int().min(1).max(5),
-        archetype: z.enum([
-          "curiosity-gap",
-          "bold-claim",
-          "story-open",
-          "question",
-          "pattern-interrupt",
-        ]),
+        // display-only; kept as a free string so a model's archetype label never
+        // fails validation (the prompt still suggests the 5 canonical archetypes).
+        archetype: z.string(),
         text: z.string(),
         word_count: z.number().int().min(1),
         estimated_duration_sec: z.number().min(0),
@@ -117,7 +113,7 @@ export const ScriptOutput = z.object({
     .array(
       z.object({
         beat_id: z.string().regex(/^B[0-9]{3}$/),
-        section: z.enum(["hook", "intro", "body", "transition", "cta", "outro"]),
+        section: z.string(), // display-only label (hook/intro/body/transition/cta/outro)
         text: z.string(),
         word_count: z.number().int().min(1),
       })
@@ -130,18 +126,7 @@ export const ScriptAudit = z.object({
   criteria: z
     .array(
       z.object({
-        name: z.enum([
-          "hook_strength",
-          "style_match",
-          "retention_pacing",
-          "clarity",
-          "originality",
-          "emotional_resonance",
-          "structure",
-          "cta_effectiveness",
-          "factual_consistency",
-          "length_adherence",
-        ]),
+        name: z.string(), // display-only criterion label
         score: z.number().int().min(1).max(10),
         comment: z.string(),
       })
