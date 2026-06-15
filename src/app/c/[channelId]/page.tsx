@@ -1,31 +1,76 @@
 import { notFound } from "next/navigation";
-import { Check, Circle, Lock, ChevronRight, Pencil, RotateCcw, Sparkles } from "lucide-react";
+import { Check, Circle, Lock, ChevronRight, Sparkles, Plus, Film } from "lucide-react";
 import { Shell } from "@/components/Shell";
 import { Card, KindBadge } from "@/components/ui";
 import { STATES, isBlockedByVisualGate } from "@/lib/pipeline/states";
-import { PHASES, MOCK_HOOKS, MOCK_VIDEOS, channelById } from "@/lib/mock";
+import { PHASES } from "@/lib/mock";
+import { isSupabaseConfigured } from "@/lib/supabase/is-configured";
+import { requireSession } from "@/lib/auth";
+import { createVideoAction } from "../actions";
+
+export const dynamic = "force-dynamic";
+
+interface VideoRow {
+  id: string;
+  title: string | null;
+  topic: string | null;
+  current_state: number;
+  status: string;
+}
 
 export default async function ChannelPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ channelId: string }>;
+  searchParams: Promise<{ video?: string }>;
 }) {
   const { channelId } = await params;
-  const channel = channelById(channelId);
+  const { video: selectedId } = await searchParams;
+
+  if (!isSupabaseConfigured()) {
+    return (
+      <Shell active="Channels">
+        <Card className="p-8 text-sm text-muted">Connect Supabase to view channels.</Card>
+      </Shell>
+    );
+  }
+
+  const { supabase, user } = await requireSession();
+  const { data: channel } = await supabase
+    .from("channels")
+    .select("id, name, handle, niche, brand_memory, onboarding_path, status")
+    .eq("id", channelId)
+    .maybeSingle();
   if (!channel) notFound();
 
-  const video = MOCK_VIDEOS[channelId]?.[0];
-  const current = video?.currentState ?? 9;
+  const { data: videosData } = await supabase
+    .from("videos")
+    .select("id, title, topic, current_state, status")
+    .eq("channel_id", channelId)
+    .order("created_at", { ascending: false });
+  const videos = (videosData ?? []) as VideoRow[];
+  const selected = videos.find((v) => v.id === selectedId) ?? videos[0] ?? null;
+  const current = selected?.current_state ?? 1;
   const scriptApproved = current > 11;
+  const bm = (channel.brand_memory ?? {}) as Record<string, unknown>;
 
   return (
-    <Shell active="Channels">
-      <div className="mb-5">
-        <div className="text-xs text-muted">{channel.name}</div>
-        <h1 className="truncate text-xl font-semibold">{video?.title ?? "New video"}</h1>
-        <p className="text-sm text-muted">
-          State {current} of 22 · {STATES[current - 1]?.title}
-        </p>
+    <Shell active="Channels" userEmail={user.email}>
+      <div className="mb-5 flex items-end justify-between gap-3">
+        <div className="min-w-0">
+          <div className="text-xs text-muted">
+            {channel.name ?? "Channel"} · {channel.handle ?? channel.status}
+          </div>
+          <h1 className="truncate text-xl font-semibold">
+            {selected ? selected.title ?? selected.topic ?? "Untitled video" : "No video yet"}
+          </h1>
+          {selected && (
+            <p className="text-sm text-muted">
+              State {current} of 22 · {STATES[current - 1]?.title}
+            </p>
+          )}
+        </div>
       </div>
 
       <div className="grid gap-5 lg:grid-cols-[230px_1fr_240px]">
@@ -39,15 +84,13 @@ export default async function ChannelPage({
                 </div>
                 <ul className="space-y-0.5">
                   {STATES.filter((s) => s.no >= phase.from && s.no <= phase.to).map((s) => {
-                    const done = s.no < current;
-                    const active = s.no === current;
+                    const done = !!selected && s.no < current;
+                    const active = !!selected && s.no === current;
                     const locked = isBlockedByVisualGate(s.no, scriptApproved);
                     return (
                       <li
                         key={s.no}
-                        className={`flex items-center gap-2 rounded-md px-1.5 py-1 text-xs ${
-                          active ? "bg-surface-2" : ""
-                        }`}
+                        className={`flex items-center gap-2 rounded-md px-1.5 py-1 text-xs ${active ? "bg-surface-2" : ""}`}
                       >
                         {done ? (
                           <Check size={13} className="shrink-0 text-accent" />
@@ -58,11 +101,7 @@ export default async function ChannelPage({
                         ) : (
                           <Circle size={11} className="shrink-0 text-lock" />
                         )}
-                        <span
-                          className={`flex-1 truncate ${
-                            done ? "text-muted" : active ? "text-fg" : "text-muted"
-                          }`}
-                        >
+                        <span className="flex-1 truncate text-muted">
                           {s.no}. {s.title}
                         </span>
                         <KindBadge kind={s.kind} />
@@ -75,91 +114,81 @@ export default async function ChannelPage({
           </div>
         </Card>
 
-        {/* active state — Hook Engineering curation */}
-        <div>
+        {/* center: videos + create */}
+        <div className="space-y-5">
           <Card className="p-5">
-            <div className="mb-1 flex items-center justify-between">
-              <h2 className="font-semibold">State 9 · Hook Engineering</h2>
-              <KindBadge kind="gate" />
-            </div>
+            <h2 className="mb-1 font-semibold">Start a new video</h2>
             <p className="mb-4 text-sm text-muted">
-              Pick the hook that fits the channel best. Each is one archetype, sized to your WPS.
+              Give a topic (or leave blank to generate ideas). This creates the project; the AI
+              pipeline runs once generation is wired (Phase 2).
             </p>
-
-            <div className="space-y-2.5">
-              {MOCK_HOOKS.map((h) => (
-                <div
-                  key={h.rank}
-                  className="rounded-lg border border-border bg-surface-2/40 p-3 transition-colors hover:border-muted"
-                >
-                  <div className="mb-1.5 flex items-center gap-2">
-                    <span className="grid h-5 w-5 place-items-center rounded-full bg-surface-2 text-[11px] font-semibold">
-                      {h.rank}
-                    </span>
-                    <span className="text-xs font-medium text-muted">{h.archetype}</span>
-                    <span className="ml-auto text-xs text-muted">
-                      {h.words}w · {h.seconds}s
-                    </span>
-                    <span className="rounded bg-accent-soft px-1.5 py-0.5 text-[11px] font-semibold text-accent">
-                      {h.score.toFixed(1)}
-                    </span>
-                  </div>
-                  <p className="text-sm leading-relaxed">{h.text}</p>
-                  <div className="mt-2.5 flex items-center gap-2">
-                    <button className="inline-flex items-center gap-1.5 rounded-md bg-accent px-2.5 py-1 text-xs font-medium text-black hover:bg-accent/90">
-                      <Check size={13} /> Approve
-                    </button>
-                    <button className="inline-flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1 text-xs text-muted hover:text-fg">
-                      <RotateCcw size={13} /> Revise
-                    </button>
-                    <button className="inline-flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1 text-xs text-muted hover:text-fg">
-                      <Pencil size={13} /> Edit
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            <div className="mt-4 border-t border-border pt-3">
-              <label className="text-xs text-muted">Revision feedback (feeds revision-memory)</label>
-              <div className="mt-1.5 flex gap-2">
-                <input
-                  disabled
-                  placeholder="e.g. make hook #2 punchier, drop the jargon…"
-                  className="flex-1 rounded-md border border-border bg-bg px-3 py-2 text-sm text-muted placeholder:text-lock"
-                />
-                <button className="rounded-md border border-border px-3 py-2 text-sm text-muted">
-                  Revise selected
-                </button>
-              </div>
-            </div>
+            <form className="flex gap-2">
+              <input type="hidden" name="channel_id" value={channelId} />
+              <input
+                name="topic"
+                placeholder="e.g. Why retail investors are the exit liquidity"
+                className="flex-1 rounded-lg border border-border bg-bg px-3 py-2 text-sm outline-none focus:border-muted"
+              />
+              <button
+                formAction={createVideoAction}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-accent px-4 py-2 text-sm font-medium text-black hover:bg-accent/90"
+              >
+                <Plus size={16} /> Create
+              </button>
+            </form>
           </Card>
-          <p className="mt-2 px-1 text-xs text-muted">
-            Preview with mock data — wired to the live pipeline in Phase 2.
-          </p>
+
+          <Card className="divide-y divide-border">
+            <div className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-muted">
+              Videos
+            </div>
+            {videos.length === 0 ? (
+              <div className="px-4 py-8 text-center text-sm text-muted">
+                <Film size={24} className="mx-auto mb-2 text-lock" />
+                No videos yet — create your first above.
+              </div>
+            ) : (
+              videos.map((v) => (
+                <a
+                  key={v.id}
+                  href={`/c/${channelId}?video=${v.id}`}
+                  className={`flex items-center gap-3 px-4 py-3 hover:bg-surface-2 ${
+                    selected?.id === v.id ? "bg-surface-2" : ""
+                  }`}
+                >
+                  <Film size={15} className="shrink-0 text-muted" />
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-sm">{v.title ?? v.topic ?? "Untitled video"}</div>
+                    <div className="text-xs text-muted">
+                      State {v.current_state} · {v.status}
+                    </div>
+                  </div>
+                </a>
+              ))
+            )}
+          </Card>
         </div>
 
-        {/* brand memory panel */}
+        {/* brand memory */}
         <Card className="h-fit p-4">
           <div className="mb-3 flex items-center gap-2">
             <Sparkles size={15} className="text-accent" />
             <h3 className="text-sm font-semibold">Brand memory</h3>
           </div>
-          <dl className="space-y-3 text-xs">
-            {[
-              ["Niche", channel.niche],
-              ["WPS", "2.85 · target 1,800–2,000 words"],
-              ["Opening", "Absolute contrarian claim, no warm-up"],
-              ["Signature", "“Surely X, right? Wrong.”"],
-              ["Enemy", "Institutions quietly rewriting the rules"],
-              ["Visual", "Hand-drawn whiteboard doodle, marker outlines"],
-            ].map(([k, v]) => (
-              <div key={k}>
-                <dt className="text-lock">{k}</dt>
-                <dd className="mt-0.5 text-fg">{v}</dd>
-              </div>
-            ))}
-          </dl>
+          {Object.keys(bm).length <= 1 ? (
+            <p className="text-xs text-muted">
+              Not built yet. Onboarding (states 4–8, 13, 17) fills this from reference material — wired
+              in Phase 2.
+            </p>
+          ) : (
+            <pre className="overflow-x-auto whitespace-pre-wrap break-words text-[11px] text-muted">
+              {JSON.stringify(bm, null, 2).slice(0, 800)}
+            </pre>
+          )}
+          <div className="mt-3 border-t border-border pt-3 text-xs text-muted">
+            <div className="text-lock">Niche</div>
+            <div className="mt-0.5 text-fg">{channel.niche ?? "—"}</div>
+          </div>
         </Card>
       </div>
     </Shell>
