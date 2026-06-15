@@ -13,9 +13,11 @@ export const MODEL_BY_CLASS: Record<string, Record<ModelClass, string>> = {
     strong: "claude-opus-4-8",
   },
   gemini: {
+    // Flash across the board: fast + reliable on the free tier, fits synchronous
+    // server-action generation. Swap `strong` to gemini-2.5-pro for higher quality.
     cheap: "gemini-2.5-flash",
-    mid: "gemini-3-pro",
-    strong: "gemini-3-pro",
+    mid: "gemini-2.5-flash",
+    strong: "gemini-2.5-flash",
   },
 };
 

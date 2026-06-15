@@ -16,6 +16,7 @@ import type {
 } from "./types";
 
 import { AnthropicLlm } from "./llm/anthropic";
+import { GeminiLlm } from "./llm/gemini";
 import { FalImage } from "./image/fal";
 import { GeminiImage } from "./image/gemini";
 import { ElevenLabsVoice } from "./voice/elevenlabs";
@@ -28,6 +29,10 @@ interface RegistryEntry {
 }
 
 const ENTRIES: RegistryEntry[] = [
+  {
+    meta: { id: "gemini", modality: "llm", displayName: "Google Gemini", keyStrategy: "platform|byok", hasPublicApi: true, unit: "1k_tokens" },
+    instance: new GeminiLlm(),
+  },
   {
     meta: { id: "anthropic", modality: "llm", displayName: "Anthropic Claude", keyStrategy: "platform|byok", hasPublicApi: true, unit: "1k_tokens" },
     instance: new AnthropicLlm(),
@@ -56,7 +61,7 @@ const ENTRIES: RegistryEntry[] = [
 
 /** Default provider id per modality when nothing more specific is selected. */
 export const DEFAULT_PROVIDER: Record<Modality, string> = {
-  llm: "anthropic",
+  llm: "gemini",
   image: "gemini", // cheap direct default; fal available as alternative/fallback
   voice: "elevenlabs",
   video: "veo",

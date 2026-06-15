@@ -29,5 +29,6 @@ export async function getSession() {
 export async function requireSession() {
   const session = await getSession();
   if (!session || !session.orgId) redirect("/login");
-  return session;
+  // narrow orgId to string for callers (redirect() returns never above)
+  return { supabase: session.supabase, user: session.user, orgId: session.orgId, role: session.role };
 }
